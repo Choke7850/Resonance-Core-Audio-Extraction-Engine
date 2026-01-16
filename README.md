@@ -1,8 +1,8 @@
-🎵 Resonance Core: Audio Extractor
+🎵 Resonance Core: Audio Extraction Engine
 
 High-Performance Web-based Audio Extraction Platform
 
-ระบบแปลงไฟล์วิดีโอเป็นเสียงคุณภาพสูง (WAV 16/24/32-bit) ผ่านหน้าเว็บ รองรับไฟล์ขนาดใหญ่ (Large File Support) พร้อมระบบ Resume Upload และจัดการไฟล์แบบ Real-time
+ระบบแปลงไฟล์วิดีโอเป็นเสียงคุณภาพสูง (WAV 16/24/32-bit) ผ่านหน้าเว็บ รองรับไฟล์ขนาดใหญ่ (Large File Support) พร้อมระบบ Resume Upload, Parallel Processing และจัดการไฟล์แบบ Real-time
 
 ✨ Features (ฟีเจอร์เด่น)
 
@@ -14,7 +14,7 @@ Resumable Upload: เน็ตหลุดหรือปิดหน้าเ�
 
 Bitrate: สูงสุด 2048 kbps
 
-Bit Depth: รองรับ 8, 16, 24, 32-bit (PCM)
+Bit Depth: รองรับ 8, 16, 24, 32-bit (PCM Codec Auto-switching)
 
 Channels: รองรับ Mono, Stereo, 4.0, 5.1, 7.1 Surround
 
@@ -26,8 +26,8 @@ Management: เปลี่ยนชื่อไฟล์ (Rename), ลบไฟ
 
 Clone Repository
 
-git clone [https://github.com/yourusername/resonance-core.git](https://github.com/yourusername/resonance-core.git)
-cd resonance-core
+git clone [https://github.com/Choke7850/Resonance-Core-Audio-Extraction-Engine.git](https://github.com/Choke7850/Resonance-Core-Audio-Extraction-Engine.git)
+cd Resonance-Core-Audio-Extraction-Engine
 
 
 Install Dependencies
@@ -35,9 +35,9 @@ Install Dependencies
 pip install -r requirements.txt
 
 
-Install FFmpeg
+Prerequisites
 
-ต้องติดตั้ง FFmpeg ลงในเครื่องและ Set Path ให้เรียบร้อย
+ต้องติดตั้ง FFmpeg และตั้งค่า System Path ให้เรียบร้อย
 
 Run Server
 
@@ -50,6 +50,6 @@ Server จะรันที่ http://localhost:5000
 
 Lead Developer & Engineering: Chok (Electronic Specialist)
 
-Co-Developer / AI Assistant: Gemini (Google)
+Co-Developer: Gemini (Google)
 
 Developed with ❤️ using Python Flask & React
