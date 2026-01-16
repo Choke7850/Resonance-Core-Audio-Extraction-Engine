@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Choke Audio Extractor</title>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Kanit', sans-serif; background-color: #0f172a; color: #e2e8f0; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 4px; }
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .neon-text { text-shadow: 0 0 10px rgba(59, 130, 246, 0.5); }
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+        .anim-pulse-ring { animation: pulse-ring 2s infinite; }
+        
+        /* Modal Animation */
+        .modal-enter { animation: modal-in 0.2s ease-out forwards; }
+        @keyframes modal-in {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        /* Custom Dropdown Animation */
+        .dropdown-enter {
+            max-height: 0;
+            opacity: 0;
+            transform: scaleY(0.95);
+            transform-origin: top;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .dropdown-enter.active {
+            max-height: 300px;
+            opacity: 1;
+            transform: scaleY(1);
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        
+        const SERVER_URL = window.location.protocol === 'file:' 
+            ? 'http://192.168.1.10:5000' 
+            : window.location.origin;
+
+        // --- ICON COMPONENTS ---
+        const Icon = ({ path, className, onClick }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" onClick={onClick} width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                {path}
+            </svg>
+        );
+
+        const Icons = {
+            Zap: <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />,
+            UploadCloud: <><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" /><path d="M12 12v9" /><path d="m16 16-4-4-4 4" /></>,
+            FileVideo: <><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" /><polyline points="14 2 14 8 20 8" /><path d="m10 13 5 3-5 3v-6Z" /></>,
+            Plus: <><path d="M5 12h14" /><path d="M12 5v14" /></>,
+            Loader2: <path d="M21 12a9 9 0 1 1-6.219-8.56" />,
+            Cpu: <><rect x="4" y="4" width="16" height="16" rx="2" /><rect x="9" y="9" width="6" height="6" /><path d="M9 1v3" /><path d="M15 1v3" /><path d="M9 20v3" /><path d="M15 20v3" /><path d="M20 9h3" /><path d="M20 14h3" /><path d="M1 9h3" /><path d="M1 14h3" /></>,
+            History: <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />,
+            HardDrive: <><line x1="22" x2="2" y1="12" y2="12" /><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" /><line x1="6" x2="6.01" y1="16" y2="16" /><line x1="10" x2="10.01" y1="16" y2="16" /></>,
+            Play: <polygon points="5 3 19 12 5 21 5 3" />,
+            Download: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></>,
+            Trash: <><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></>,
+            Edit: <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />,
+            X: <><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></>,
+            ChevronDown: <polyline points="6 9 12 15 18 9" />
+        };
+
+        // --- Custom Dropdown Component (New) ---
+        const CustomSelect = ({ label, value, options, onChange }) => {
+            const [isOpen, setIsOpen] = useState(false);
+            const ref = useRef(null);
+
+            // ปิด Dropdown เมื่อคลิกข้างนอก
+            useEffect(() => {
+                const handleClickOutside = (event) => {
+                    if (ref.current && !ref.current.contains(event.target)) {
+                        setIsOpen(false);
+                    }
+                };
+                document.addEventListener('mousedown', handleClickOutside);
+                return () => document.removeEventListener('mousedown', handleClickOutside);
+            }, []);
+
+            const selectedLabel = options.find(opt => opt.value === value)?.label || value;
+
+            return (
+                <div className="relative" ref={ref}>
+                    <label className="text-xs text-slate-400 mb-1 block font-mono">{label}</label>
+                    <button 
+                        onClick={() => setIsOpen(!isOpen)}
+                        className={`w-full bg-slate-800 border ${isOpen ? 'border-blue-500 shadow-lg shadow-blue-500/20' : 'border-slate-700'} rounded p-2.5 text-sm text-left flex justify-between items-center transition-all duration-300 hover:border-slate-500 outline-none`}
+                    >
+                        <span className="truncate text-slate-200">{selectedLabel}</span>
+                        <Icon path={Icons.ChevronDown} className={`w-4 h-4 transition-transform duration-300 ${isOpen ? 'rotate-180 text-blue-400' : 'text-slate-500'}`} />
+                    </button>
+                    
+                    {/* Animated Dropdown Menu */}
+                    <div className={`absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden dropdown-enter ${isOpen ? 'active' : ''}`}>
+                        <div className="py-1 max-h-60 overflow-y-auto custom-scrollbar">
+                            {options.map((opt) => (
+                                <div 
+                                    key={opt.value}
+                                    onClick={() => {
+                                        onChange({ target: { value: opt.value } });
+                                        setIsOpen(false);
+                                    }}
+                                    className={`px-3 py-2.5 text-sm cursor-pointer transition-colors border-l-2 ${value === opt.value ? 'bg-blue-600/10 text-blue-400 border-blue-500' : 'border-transparent text-slate-300 hover:bg-slate-700 hover:text-white'}`}
+                                >
+                                    {opt.label}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [file, setFile] = useState(null);
+            const [uploading, setUploading] = useState(false);
+            const [progress, setProgress] = useState(0);
+            const [statusMsg, setStatusMsg] = useState("");
+            const [errorMsg, setErrorMsg] = useState("");
+            const [history, setHistory] = useState([]);
+            const [playingFile, setPlayingFile] = useState(null);
+            
+            // Rename Modal State
+            const [showRenameModal, setShowRenameModal] = useState(false);
+            const [renameData, setRenameData] = useState({ id: null, name: '' });
+            const [renameError, setRenameError] = useState("");
+            
+            // Options
+            const [bitrate, setBitrate] = useState("320");
+            const [channels, setChannels] = useState("Stereo");
+            const [bitDepth, setBitDepth] = useState("16");
+
+            // Option Lists
+            const bitrateOptions = [
+                { value: "128", label: "128 kbps" },
+                { value: "192", label: "192 kbps" },
+                { value: "320", label: "320 kbps" },
+                { value: "512", label: "512 kbps (High)" },
+                { value: "1024", label: "1024 kbps (Super)" },
+                { value: "2048", label: "2048 kbps (Ultra)" }
+            ];
+            
+            const channelOptions = [
+                { value: "Stereo", label: "Stereo (2.0)" },
+                { value: "4.0", label: "Quad (4.0)" },
+                { value: "7.0", label: "Surround (7.0)" },
+                { value: "7.1", label: "Surround (7.1)" }
+            ];
+
+            const bitDepthOptions = [
+                { value: "8", label: "8-bit (Low Res)" },
+                { value: "16", label: "16-bit (Standard CD)" },
+                { value: "24", label: "24-bit (Studio Quality)" },
+                { value: "32", label: "32-bit (Ultra High Dynamic)" }
+            ];
+
+            const audioRef = useRef(null);
+
+            useEffect(() => {
+                fetchHistory();
+                const interval = setInterval(fetchHistory, 5000);
+                return () => clearInterval(interval);
+            }, []);
+
+            const fetchHistory = async () => {
+                try {
+                    const res = await fetch(`${SERVER_URL}/history?_t=${new Date().getTime()}`, { 
+                        cache: 'no-store',
+                        headers: { 'Pragma': 'no-cache', 'Cache-Control': 'no-cache' }
+                    });
+                    if (!res.ok) throw new Error("Server Error");
+                    const data = await res.json();
+                    setHistory(data);
+                } catch (err) { }
+            };
+
+            const handleFileChange = (e) => {
+                if (e.target.files[0]) {
+                    setFile(e.target.files[0]);
+                    setProgress(0);
+                    setStatusMsg("พร้อมอัปโหลด (ระบบ Resume รองรับ)");
+                    setErrorMsg("");
+                }
+            };
+
+            const generateFileId = (file) => {
+                const str = `${file.name}-${file.size}-${file.lastModified}`;
+                let hash = 0;
+                for (let i = 0; i < str.length; i++) {
+                    const char = str.charCodeAt(i);
+                    hash = ((hash << 5) - hash) + char;
+                    hash = hash & hash; 
+                }
+                return `file-${Math.abs(hash).toString(16)}-${file.size.toString(16)}`;
+            };
+
+            const uploadFile = async () => {
+                if (!file) return;
+
+                setUploading(true);
+                setErrorMsg("");
+                setStatusMsg("กำลังตรวจสอบไฟล์...");
+
+                try {
+                    const CHUNK_SIZE = 4 * 1024 * 1024; 
+                    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+                    const fileId = generateFileId(file);
+
+                    let existingChunks = new Set();
+                    try {
+                        const checkRes = await fetch(`${SERVER_URL}/check_chunks/${fileId}`);
+                        if (checkRes.ok) {
+                            const checkData = await checkRes.json();
+                            existingChunks = new Set(checkData.chunks);
+                            console.log("Resuming... Found chunks:", existingChunks.size);
+                        }
+                    } catch(e) {
+                        console.log("New upload or check failed, starting fresh.");
+                    }
+
+                    setStatusMsg(`กำลังเริ่ม... (0/${totalChunks})`);
+
+                    for (let i = 0; i < totalChunks; i++) {
+                        if (existingChunks.has(i)) {
+                            const percent = Math.round(((i + 1) / totalChunks) * 100);
+                            setProgress(percent);
+                            setStatusMsg(`ข้ามข้อมูลเดิม... ${percent}% (Chunk ${i+1}/${totalChunks})`);
+                            continue;
+                        }
+
+                        const start = i * CHUNK_SIZE;
+                        const end = Math.min(file.size, start + CHUNK_SIZE);
+                        const chunk = file.slice(start, end);
+
+                        const formData = new FormData();
+                        formData.append("file", chunk);
+                        formData.append("file_id", fileId);
+                        formData.append("chunk_index", i.toString());
+
+                        const res = await fetch(`${SERVER_URL}/upload_chunk`, {
+                            method: "POST",
+                            body: formData
+                        });
+
+                        if (!res.ok) {
+                            const errText = await res.text();
+                            throw new Error(`Upload Failed at chunk ${i}: ${res.status} - ${errText}`);
+                        }
+
+                        const percent = Math.round(((i + 1) / totalChunks) * 100);
+                        setProgress(percent);
+                        setStatusMsg(`กำลังอัปโหลด... ${percent}% (Chunk ${i+1}/${totalChunks})`);
+                    }
+
+                    setStatusMsg("กำลังรวมไฟล์และเริ่มแปลงเสียง...");
+                    
+                    const assembleRes = await fetch(`${SERVER_URL}/assemble`, {
+                        method: "POST",
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            file_id: fileId,
+                            total_chunks: totalChunks,
+                            filename: file.name,
+                            options: { bitrate, channels, bit_depth: bitDepth }
+                        })
+                    });
+                    
+                    if (!assembleRes.ok) {
+                        const errText = await assembleRes.text();
+                        throw new Error(`Assembly Failed: ${errText}`);
+                    }
+                    
+                    setStatusMsg("เสร็จสิ้น! ระบบกำลังแปลงไฟล์อยู่เบื้องหลัง");
+                    setFile(null);
+                    setTimeout(() => setStatusMsg(""), 5000);
+                    fetchHistory();
+
+                } catch (err) {
+                    console.error("Upload Error:", err);
+                    setStatusMsg("");
+                    setErrorMsg(`เกิดข้อผิดพลาด: ${err.message}`); 
+                } finally {
+                    setUploading(false);
+                }
+            };
+
+            const openRenameModal = (id, currentName) => {
+                setRenameData({ id, name: currentName });
+                setRenameError("");
+                setShowRenameModal(true);
+            };
+
+            const confirmRename = async () => {
+                if (!renameData.name.trim()) return;
+                
+                try {
+                    const res = await fetch(`${SERVER_URL}/rename/${renameData.id}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ new_name: renameData.name })
+                    });
+                    
+                    const text = await res.text();
+                    let data;
+                    try { data = JSON.parse(text); } 
+                    catch (e) { throw new Error(`Server Error (${res.status}): ${res.statusText}`); }
+                    
+                    if (res.ok) {
+                        setHistory(prev => prev.map(item => {
+                            if (item.id === renameData.id) {
+                                return { ...item, original_name: renameData.name, filename: data.new_name };
+                            }
+                            return item;
+                        }));
+                        setShowRenameModal(false);
+                    } else {
+                        setRenameError(data.message || "เกิดข้อผิดพลาด");
+                    }
+                } catch (err) {
+                    setRenameError("เชื่อมต่อ Server ไม่ได้: " + err.message);
+                }
+            };
+
+            const deleteFile = async (id, name) => {
+                if (!confirm(`ยืนยันการลบไฟล์ "${name}"?\n\nการกระทำนี้ไม่สามารถกู้คืนได้!`)) return;
+
+                try {
+                    const res = await fetch(`${SERVER_URL}/delete/${id}`, { method: 'DELETE' });
+                    if (res.status === 200 || res.status === 404) {
+                        setHistory(prev => prev.filter(item => item.id !== id));
+                        if (playingFile && playingFile.includes(id)) {
+                            setPlayingFile(null);
+                            if (audioRef.current) {
+                                audioRef.current.pause();
+                                audioRef.current.src = "";
+                            }
+                        }
+                    } else {
+                        alert("ลบไม่สำเร็จ: " + res.statusText);
+                    }
+                } catch (err) {
+                    alert("เชื่อมต่อ Server ไม่ได้");
+                }
+            };
+
+            const formatBytes = (bytes, decimals = 2) => {
+                if (!+bytes) return '0 Bytes';
+                const k = 1024;
+                const dm = decimals < 0 ? 0 : decimals;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+            };
+
+            const playAudio = (filename) => {
+                const url = `${SERVER_URL}/stream/${filename}`;
+                setPlayingFile(filename);
+                if (audioRef.current) {
+                    audioRef.current.src = url;
+                    audioRef.current.play();
+                }
+            };
+
+            return (
+                <div className="min-h-screen p-4 md:p-8 flex flex-col items-center relative">
+                    
+                    {/* RENAME MODAL */}
+                    {showRenameModal && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm modal-enter">
+                            <div className="bg-slate-800 border border-slate-600 rounded-xl p-6 w-full max-w-md shadow-2xl relative">
+                                <button onClick={() => setShowRenameModal(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white transition">
+                                    <Icon path={Icons.X} className="w-5 h-5" />
+                                </button>
+                                <h3 className="text-xl font-bold text-white mb-4">เปลี่ยนชื่อไฟล์</h3>
+                                <input 
+                                    type="text" 
+                                    value={renameData.name}
+                                    onChange={(e) => setRenameData({...renameData, name: e.target.value})}
+                                    className="w-full bg-slate-900 border border-slate-700 rounded p-3 text-white focus:border-blue-500 outline-none mb-4"
+                                    placeholder="ใส่ชื่อไฟล์ใหม่..."
+                                    autoFocus
+                                />
+                                {renameError && <p className="text-red-400 text-sm mb-4">{renameError}</p>}
+                                <div className="flex justify-end gap-3">
+                                    <button 
+                                        onClick={() => setShowRenameModal(false)}
+                                        className="px-4 py-2 rounded text-slate-300 hover:bg-slate-700 transition"
+                                    >
+                                        ยกเลิก
+                                    </button>
+                                    <button 
+                                        onClick={confirmRename}
+                                        className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-bold transition shadow-lg shadow-blue-500/20"
+                                    >
+                                        บันทึก
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <header className="w-full max-w-4xl mb-8 flex items-center justify-between glass-panel p-4 rounded-2xl shadow-lg">
+                        <div className="flex items-center gap-3">
+                            <Icon path={Icons.Zap} className="text-blue-400 w-8 h-8" />
+                            <div>
+                                <h1 className="text-2xl font-bold neon-text">CHOK AUDIO EXTRACTOR</h1>
+                                <p className="text-xs text-slate-400 font-mono">SERVER: {SERVER_URL} | PORT: 5000</p>
+                            </div>
+                        </div>
+                        <div className="hidden md:block text-right text-xs text-slate-500 font-mono">
+                            POWERED BY PYTHON & FFMPEG<br/>
+                            VER 1.6.0 (ANIMATED UI)
+                        </div>
+                    </header>
+
+                    <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="glass-panel p-6 rounded-2xl shadow-xl flex flex-col gap-6">
+                            <h2 className="text-xl font-semibold flex items-center gap-2 text-blue-300">
+                                <Icon path={Icons.UploadCloud} className="w-6 h-6" /> Upload Video
+                            </h2>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <CustomSelect 
+                                        label="Bitrate (kbps)" 
+                                        value={bitrate} 
+                                        options={bitrateOptions} 
+                                        onChange={(e) => setBitrate(e.target.value)} 
+                                    />
+                                </div>
+                                <div>
+                                    <CustomSelect 
+                                        label="Channels" 
+                                        value={channels} 
+                                        options={channelOptions} 
+                                        onChange={(e) => setChannels(e.target.value)} 
+                                    />
+                                </div>
+                                <div className="col-span-2">
+                                    <CustomSelect 
+                                        label="Bit Depth (Resolution)" 
+                                        value={bitDepth} 
+                                        options={bitDepthOptions} 
+                                        onChange={(e) => setBitDepth(e.target.value)} 
+                                    />
+                                </div>
+                            </div>
+                            <div className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center transition-all ${file ? 'border-blue-500 bg-blue-900/10' : 'border-slate-600 hover:border-slate-400'}`}>
+                                <input type="file" id="fileInput" className="hidden" accept="video/*" onChange={handleFileChange} />
+                                {file ? (
+                                    <div className="text-center">
+                                        <div className="flex justify-center mb-2">
+                                            <Icon path={Icons.FileVideo} className="w-12 h-12 text-blue-400" />
+                                        </div>
+                                        <p className="font-mono text-sm truncate max-w-[200px] mx-auto">{file.name}</p>
+                                        <p className="text-xs text-slate-400">{formatBytes(file.size)}</p>
+                                        <button onClick={() => setFile(null)} className="mt-2 text-xs text-red-400 hover:text-red-300">Cancel</button>
+                                    </div>
+                                ) : (
+                                    <label htmlFor="fileInput" className="cursor-pointer text-center">
+                                        <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-3 anim-pulse-ring">
+                                            <Icon path={Icons.Plus} className="text-blue-400 w-8 h-8" />
+                                        </div>
+                                        <p className="text-sm font-semibold">แตะเพื่อเลือกไฟล์วิดีโอ</p>
+                                        <p className="text-xs text-slate-500 mt-1">รองรับไฟล์ขนาดใหญ่ (GB)</p>
+                                    </label>
+                                )}
+                            </div>
+                            
+                            {/* ERROR MESSAGE BOX */}
+                            {errorMsg && (
+                                <div className="bg-red-900/50 border border-red-500/50 p-3 rounded-lg text-red-200 text-xs font-mono break-all">
+                                    <strong className="block mb-1 text-red-400">ERROR:</strong>
+                                    {errorMsg}
+                                </div>
+                            )}
+
+                            {uploading && (
+                                <div>
+                                    <div className="flex justify-between text-xs mb-1 text-blue-300">
+                                        <span>Uploading...</span>
+                                        <span>{progress}%</span>
+                                    </div>
+                                    <div className="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
+                                        <div className="bg-blue-500 h-full transition-all duration-300" style={{width: `${progress}%`}}></div>
+                                    </div>
+                                </div>
+                            )}
+                            <button 
+                                onClick={uploadFile}
+                                disabled={!file || uploading}
+                                className={`w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all ${!file || uploading ? 'bg-slate-700 text-slate-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20'}`}
+                            >
+                                {uploading ? <span className="animate-spin"><Icon path={Icons.Loader2} className="w-5 h-5" /></span> : <Icon path={Icons.Cpu} className="w-5 h-5" />}
+                                {uploading ? 'PROCESSING...' : 'START EXTRACTION'}
+                            </button>
+                            {statusMsg && !errorMsg && <p className="text-center text-xs text-green-400 font-mono animate-pulse">{statusMsg}</p>}
+                        </div>
+
+                        <div className="glass-panel p-6 rounded-2xl shadow-xl flex flex-col h-[500px]">
+                            <h2 className="text-xl font-semibold flex items-center gap-2 text-green-300 mb-4">
+                                <Icon path={Icons.History} className="w-6 h-6" /> History & Player
+                            </h2>
+                            <div className="bg-slate-900/50 p-4 rounded-xl mb-4 border border-slate-700">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-xs font-mono text-blue-400">NOW PLAYING</span>
+                                    {playingFile && <span className="text-xs text-slate-400 truncate max-w-[150px]">{playingFile}</span>}
+                                </div>
+                                <audio ref={audioRef} controls className="w-full h-8" style={{filter: 'invert(1) hue-rotate(180deg)'}} />
+                            </div>
+                            <div className="flex-1 overflow-y-auto pr-2 space-y-3">
+                                {history.length === 0 ? (
+                                    <div className="text-center text-slate-500 mt-10">
+                                        <div className="flex justify-center mb-2">
+                                            <Icon path={Icons.HardDrive} className="w-10 h-10 opacity-50" />
+                                        </div>
+                                        <p>ยังไม่มีไฟล์ในระบบ</p>
+                                    </div>
+                                ) : (
+                                    history.map((item) => (
+                                        <div key={item.id} className="bg-slate-800/50 p-3 rounded-lg border border-slate-700 hover:border-blue-500/50 transition-all group">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div className="truncate max-w-[70%]">
+                                                    <p className="font-semibold text-sm truncate text-slate-200">{item.original_name}</p>
+                                                    <p className="text-[10px] text-slate-400 font-mono">
+                                                        {item.options.bit_depth || '16'}-bit | {item.options.bitrate}k | {item.options.channels}
+                                                    </p>
+                                                    <p className="text-[10px] text-slate-500">{formatBytes(item.size)}</p>
+                                                </div>
+                                                <span className="text-[10px] text-slate-500 bg-slate-900 px-2 py-1 rounded">{item.date.split(' ')[1]}</span>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => playAudio(item.filename)} className="flex-1 py-1.5 bg-green-600/20 text-green-400 hover:bg-green-600 hover:text-white rounded text-xs flex items-center justify-center gap-1 transition-colors">
+                                                    <Icon path={Icons.Play} className="w-3 h-3 mr-1" /> Play
+                                                </button>
+                                                <a href={`${SERVER_URL}/stream/${item.filename}`} download className="flex-1 py-1.5 bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white rounded text-xs flex items-center justify-center gap-1 transition-colors">
+                                                    <Icon path={Icons.Download} className="w-3 h-3 mr-1" /> Download
+                                                </a>
+                                                <button onClick={() => openRenameModal(item.id, item.original_name)} className="px-2 py-1.5 bg-yellow-600/20 text-yellow-400 hover:bg-yellow-600 hover:text-white rounded text-xs flex items-center justify-center transition-colors" title="Rename">
+                                                    <Icon path={Icons.Edit} className="w-3 h-3" />
+                                                </button>
+                                                <button onClick={() => deleteFile(item.id, item.original_name)} className="px-2 py-1.5 bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white rounded text-xs flex items-center justify-center transition-colors" title="Delete">
+                                                    <Icon path={Icons.Trash} className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

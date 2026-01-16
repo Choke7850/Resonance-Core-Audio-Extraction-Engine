@@ -1,0 +1,16 @@
+Ignore Python cache
+
+pycache/
+*.pyc
+
+Ignore Storage (IMPORTANT: Don't upload 200GB files!)
+
+server_storage/
+server_storage/uploads/
+server_storage/processed/
+server_storage/history.json
+
+System files
+
+.DS_Store
+Thumbs.db
